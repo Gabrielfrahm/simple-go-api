@@ -15,3 +15,15 @@ CREATE TABLE users(
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_nick_key" ON "users"("nick");
+
+
+-- create table followers
+DROP TABLE IF EXISTS followers;
+CREATE TABLE followers(
+  "user_id" uuid NOT NULL,
+  FOREIGN KEY ("user_id") REFERENCES users(id) ON DELETE CASCADE,
+  "follower_id" uuid NOT NULL,
+  FOREIGN KEY ("follower_id") REFERENCES users(id) ON DELETE CASCADE,
+
+  PRIMARY KEY (user_id, follower_id)
+);

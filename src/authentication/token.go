@@ -33,6 +33,21 @@ func ValidateToken(r *http.Request) error {
 	return errors.New("token invalid")
 }
 
+func ExtractUser(r *http.Request) (string, error) {
+	tokenString := extractToken(r)
+	token, err := jwt.Parse(tokenString, returnKeyVerification)
+	if err != nil {
+		return "", err
+	}
+
+	if permissions, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID := permissions["userID"]
+		return fmt.Sprint(userID), nil
+	}
+
+	return "", errors.New("invalid token")
+}
+
 func extractToken(r *http.Request) string {
 	token := r.Header.Get("Authorization")
 	if len(strings.Split(token, " ")) == 2 {

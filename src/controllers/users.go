@@ -1,11 +1,14 @@
 package controllers
 
 import (
+	"api/src/authentication"
 	"api/src/database"
 	"api/src/models"
 	"api/src/repositories"
 	"api/src/responses"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -91,13 +94,24 @@ func ListOneUser(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	requestBody, err := io.ReadAll(r.Body)
-
+	userToken, err := authentication.ExtractUser(r)
 	if err != nil {
 		responses.Error(w, http.StatusUnprocessableEntity, err)
 		return
 	}
 
+	if params["userId"] != userToken {
+		responses.Error(w, http.StatusForbidden, errors.New("forbidden"))
+		return
+	}
+
+	requestBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		responses.Error(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+
+	fmt.Println(userToken)
 	var user models.User
 	if err = json.Unmarshal(requestBody, &user); err != nil {
 		responses.Error(w, http.StatusBadRequest, err)
@@ -129,6 +143,16 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
+	userToken, err := authentication.ExtractUser(r)
+	if err != nil {
+		responses.Error(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+
+	if params["userId"] != userToken {
+		responses.Error(w, http.StatusForbidden, errors.New("forbidden"))
+		return
+	}
 
 	db, err := database.Connection()
 	if err != nil {
@@ -144,4 +168,96 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responses.JSON(w, http.StatusOK, nil)
+}
+
+func FollowUser(w http.ResponseWriter, r *http.Request) {
+	followerID, err := authentication.ExtractUser(r)
+	if err != nil {
+		responses.Error(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	params := mux.Vars(r)
+	if followerID == params["userId"] {
+		responses.Error(w, http.StatusForbidden, errors.New("not allowed follower yourself"))
+		return
+	}
+	db, err := database.Connection()
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer db.Close()
+
+	repository := repositories.NewUsersRepository(db)
+	if err = repository.Follow(params["userId"], followerID); err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	responses.JSON(w, http.StatusNoContent, nil)
+}
+
+func UnfollowUser(w http.ResponseWriter, r *http.Request) {
+	followerID, err := authentication.ExtractUser(r)
+	if err != nil {
+		responses.Error(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	params := mux.Vars(r)
+	if followerID == params["userId"] {
+		responses.Error(w, http.StatusForbidden, errors.New("not allowed unfollow yourself"))
+		return
+	}
+	db, err := database.Connection()
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer db.Close()
+
+	repository := repositories.NewUsersRepository(db)
+	if err = repository.Unfollow(params["userId"], followerID); err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	responses.JSON(w, http.StatusNoContent, nil)
+}
+
+func SearchFollowers(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	db, err := database.Connection()
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer db.Close()
+
+	repository := repositories.NewUsersRepository(db)
+	users, err := repository.SearchFollowers(params["userId"])
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	responses.JSON(w, http.StatusOK, users)
+}
+
+func SearchFollowings(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	db, err := database.Connection()
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer db.Close()
+
+	repository := repositories.NewUsersRepository(db)
+	users, err := repository.SearchFollowings(params["userId"])
+	if err != nil {
+		responses.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	responses.JSON(w, http.StatusOK, users)
 }

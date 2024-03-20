@@ -2,6 +2,7 @@ package routes
 
 import (
 	"api/src/middlewares"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -22,6 +23,7 @@ func Configure(r *mux.Router) *mux.Router {
 		if route.RequerAuthentication {
 			r.HandleFunc(route.Uri, middlewares.Logger(middlewares.Authenticate(route.Function))).Methods(route.Method)
 		} else {
+			fmt.Println("caiu aqui")
 			r.HandleFunc(route.Uri, middlewares.Logger(route.Function)).Methods(route.Method)
 		}
 	}
